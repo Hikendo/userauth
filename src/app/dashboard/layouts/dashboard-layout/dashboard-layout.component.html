@@ -3,4 +3,5 @@
 <h3>Usuario: </h3>
 <pre>f : {{ user() | json}}</pre>
 
-<button routerLink="/auth/login">Login</button>
+<!--span class="mt-4" routerLink="/auth/login">Login</span-->
+<span class="mt-4" (click)="logout()">Cerrar sesion</span>

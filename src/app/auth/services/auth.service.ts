@@ -53,7 +53,10 @@ export class AuthService {
     //obtener el valor del token
     const token= localStorage.getItem('token');
     //si nuestro token no existe salimos y regresamos false
-    if(!token) return of(false);
+    if(!token) {
+      this.logout();
+      return of(false);
+    }
     //nuestras contantes del header autorizacion y barer para las credenciales del header token
     const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
     //mandamos nuestra peticion de tipo get con el token y los headers
@@ -66,5 +69,10 @@ export class AuthService {
         return of(false)
       }),
     )
+  }
+  logout(){
+    this._currentUser.set(null);
+    this._authStatus.set(AuthStatus.notAuthenticated);
+    localStorage.removeItem('token');
   }
 }

@@ -17,4 +17,8 @@ export class DashboardLayoutComponent {
   //Aun mejor si usamos una signal computada
   public user= computed(()=>this.authService.currentUser());
 
+  logout(){
+    this.authService.logout();
+  }
+
 }
