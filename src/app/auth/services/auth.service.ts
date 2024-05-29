@@ -1,8 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
-import { AuthStatus, LoginResponse, User } from '../interfaces';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable, catchError, map, of, retry, tap, throwError } from 'rxjs';
+import { AuthStatus, CheckTokenResponse, LoginResponse, User } from '../interfaces';
 
 @Injectable({
   providedIn: 'root'
@@ -16,9 +16,22 @@ export class AuthService {
   private _authStatus= signal<AuthStatus>(AuthStatus.checking);
 
   //con esto exponemos los datos fuera del servico, pero nos aseguramos de que no sean modificados desde el exterior
-  public currentUser= computed(()=> this._currentUser);
-  public authStatus= computed(()=> this._authStatus)
-  constructor() { }
+  public currentUser= computed(()=> this._currentUser());
+  public authStatus= computed(()=> this._authStatus())
+
+  constructor(){
+    this.checkAuthStatus().subscribe();
+  }
+
+  //DRY
+  private successAuthentication(user: User, token: string): boolean {
+            //si sale bien establecemos el usuario, el estatus y guardamos el token en el local storage
+
+    this._currentUser.set(user);
+        this._authStatus.set(AuthStatus.authenticated);
+        localStorage.setItem('token', token);
+      return true;
+  }
 
   login(email: string, password: string): Observable<boolean>{
     const url=`${this.baseurl}/auth/login`;
@@ -27,19 +40,31 @@ export class AuthService {
 
     return this.http.post<LoginResponse>( url , body )
     .pipe(
-      tap(({user , token})=> {
-        this._currentUser.set(user);
-        this._authStatus.set(AuthStatus.authenticated);
-        localStorage.setItem('token', token);
-        console.log({user, token});
-      }
-    ),
-    map(()=> true),
+      map(({user , token})=> this.successAuthentication(user,token) ),
+
     //atraparemos todos los errores
-    catchError(err=> {
-        console.log(err);
-        return throwError(()=> 'Ocurrio un error inesperado');
-    })
+    catchError(err=> throwError(()=> err.error.message ) )
     );
+  }
+  checkAuthStatus():Observable<boolean>{
+
+    //nuestra ruta del endpoint para revisar el token
+    const url = `${ this.baseurl }/auth/check-token`;
+    //obtener el valor del token
+    const token= localStorage.getItem('token');
+    //si nuestro token no existe salimos y regresamos false
+    if(!token) return of(false);
+    //nuestras contantes del header autorizacion y barer para las credenciales del header token
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    //mandamos nuestra peticion de tipo get con el token y los headers
+    return this.http.get<CheckTokenResponse>(url, {headers})
+    .pipe(
+      map(({user , token})=>  this.successAuthentication(user,token) ),
+        //console.log(this.currentUser())),
+      catchError(()=> {
+        this._authStatus.set(AuthStatus.notAuthenticated)
+        return of(false)
+      }),
+    )
   }
 }
